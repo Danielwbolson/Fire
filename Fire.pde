@@ -21,16 +21,16 @@ PeasyCam camera;
 void setup(){
   size(1024, 960, P3D);
   
-  acceleration = new PVector(0, 9.8, 0);
+  acceleration = new PVector(40, -20, 40);
   velocity = new ArrayList<PVector>();
   position = new ArrayList<PVector>();
   lifetime = new ArrayList<Float>();
-  MAX_LIFE = 1;
+  MAX_LIFE = .61;
   lifeDecay = 255.0 / MAX_LIFE;
   SCENE_SIZE = 100;
-  strokeWeight(15);
-  spawnRate = 25;
-  sampleRadius = 2;
+  strokeWeight(12);
+  spawnRate = 750;
+  sampleRadius = .1;
   
   render_x = 0;
   render_y = 0;
@@ -77,7 +77,19 @@ void Update(float dt){
     position.get(i).y += velocity.get(i).y * dt;
     position.get(i).z += (velocity.get(i).z * dt);
     
-    velocity.get(i).y += acceleration.y * dt;
+    velocity.get(i).y += (acceleration.y * (1 + abs(SCENE_SIZE/2 - position.get(i).x)) * dt);
+    
+    if(position.get(i).x > SCENE_SIZE/2) {
+      velocity.get(i).x -= acceleration.x * dt;
+    } else {
+      velocity.get(i).x += acceleration.x * dt;
+    }
+    
+    if(position.get(i).z > SCENE_SIZE/2) {
+      velocity.get(i).z -= acceleration.z * dt;
+    } else {
+      velocity.get(i).z += acceleration.z * dt;
+    }
     
     lifetime.set(i, lifetime.get(i) - dt);
     
@@ -151,8 +163,8 @@ void renderPoints(){
     }  
     
     //color over time
-    stroke(0, lifetime.get(i) * lifeDecay, 255-(lifetime.get(i) * lifeDecay));
-    strokeWeight(lifetime.get(i) * lifeDecay / 25.5);
+    stroke(255, lifetime.get(i) * lifeDecay, 0);
+    strokeWeight(6 + lifetime.get(i) * lifeDecay / 25.5);
     
     //moving to new position
     pushMatrix();
@@ -167,10 +179,10 @@ void addPoint(){
   for(int i = 0; i < spawnRate; i++) {
     //calculate uniform disk
     //use random and sqrt for uniform disk, but I just want edge
-    float r = sampleRadius * sqrt(random(1));
-    float theta = 2 * PI * random(1);
-    
-    velocity.add(new PVector(random(-2, 2), random(-8, -10), random(-2, 2)));
+    float r = sampleRadius * sqrt(random(0, 1));
+    float theta = 2 * PI * random(0, 1);
+
+    velocity.add(new PVector(random(-12, 12), 0, random(-12, 12)));
     position.add(new PVector(SCENE_SIZE/2 + r * sin(theta), random(SCENE_SIZE - 1, SCENE_SIZE), SCENE_SIZE/2 + r * cos(theta)));
     lifetime.add(MAX_LIFE);
   }
@@ -179,11 +191,16 @@ void addPoint(){
 //renders our floor
 void setupScene(){
   pushMatrix();
-  fill(#210100);
+  fill(#292900);
   noStroke();
   translate(render_x, 0, render_z);
   //floor
   translate(SCENE_SIZE/2, 1+SCENE_SIZE, SCENE_SIZE/2);
   box(SCENE_SIZE, 1, SCENE_SIZE);
+  //firewood
+  fill(#210100);
+  translate(0, -0.75, 0);
+  box(2, 1.5, 6);
+  box(6, 1.5, 2);
   popMatrix();
 }  
