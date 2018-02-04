@@ -5,6 +5,11 @@ PVector acceleration;
 ArrayList<PVector> velocity;
 ArrayList<PVector> position;
 ArrayList<Float> lifetime;
+
+ArrayList<PVector> smokeVel;
+ArrayList<PVector> smokePos;
+ArrayList<Float> smokeLife;
+
 float MAX_LIFE;
 float lifeDecay;
 float SCENE_SIZE;
@@ -21,16 +26,20 @@ PeasyCam camera;
 void setup(){
   size(1024, 960, P3D);
   
-  acceleration = new PVector(40, -20, 40);
+  acceleration = new PVector(0, -10, 0);
   velocity = new ArrayList<PVector>();
   position = new ArrayList<PVector>();
   lifetime = new ArrayList<Float>();
-  MAX_LIFE = .61;
+  smokeVel = new ArrayList<PVector>();
+  smokePos = new ArrayList<PVector>();
+  smokeLife = new ArrayList<Float>();
+  
+  MAX_LIFE = .8;
   lifeDecay = 255.0 / MAX_LIFE;
   SCENE_SIZE = 100;
   strokeWeight(12);
-  spawnRate = 750;
-  sampleRadius = .1;
+  spawnRate = 375;
+  sampleRadius = 1.5;
   
   render_x = 0;
   render_y = 0;
@@ -38,8 +47,6 @@ void setup(){
   
   float cameraZ = ((SCENE_SIZE-2.0) / tan(PI*60.0 / 360.0));
   perspective(PI/3.0, 1, 0.1, cameraZ*10.0);
-  
-  //camera = new PeasyCam(this, SCENE_SIZE/2, SCENE_SIZE, (SCENE_SIZE/2.0) / tan (PI*30.0 / 180.0), SCENE_SIZE/2.0, SCENE_SIZE/2.0, 0, 0, 1, 0);
 
   camera = new PeasyCam(this, SCENE_SIZE/2, 19 * SCENE_SIZE / 20, (SCENE_SIZE/2.0) / tan (PI*30.0 / 180.0), 10);
 
@@ -72,29 +79,35 @@ void TimeStep(){
 
 //calculate how far to move points
 void Update(float dt){
+  float slowDown = .6;
   for(int i = 0; i < position.size(); i++){
-    position.get(i).x += (velocity.get(i).x * dt);
+    
+    position.get(i).x += velocity.get(i).x * dt;
     position.get(i).y += velocity.get(i).y * dt;
-    position.get(i).z += (velocity.get(i).z * dt);
+    position.get(i).z += velocity.get(i).z * dt;
+
+    velocity.get(i).y += acceleration.y * dt;
+    velocity.get(i).x += random(-30, 30) * dt;
+    velocity.get(i).z += random(-30, 30) * dt;
     
-    velocity.get(i).y += (acceleration.y * (1 + abs(SCENE_SIZE/2 - position.get(i).x)) * dt);
-    
-    if(position.get(i).x > SCENE_SIZE/2) {
-      velocity.get(i).x -= acceleration.x * dt;
-    } else {
-      velocity.get(i).x += acceleration.x * dt;
-    }
-    
-    if(position.get(i).z > SCENE_SIZE/2) {
-      velocity.get(i).z -= acceleration.z * dt;
-    } else {
-      velocity.get(i).z += acceleration.z * dt;
-    }
-    
+    Bounds(position.get(i), velocity.get(i));
+   
     lifetime.set(i, lifetime.get(i) - dt);
-    
-    CheckBounds(position.get(i), velocity.get(i));  //simulate floor collision
   }
+  if(smokePos.size() > 0) {
+    for(int i = smokePos.size() - 1; i > 0; i--) {
+        
+      smokePos.get(i).x += smokeVel.get(i).x * dt * slowDown;
+      smokePos.get(i).y += smokeVel.get(i).y * dt * slowDown;
+      smokePos.get(i).z += smokeVel.get(i).z * dt * slowDown;
+
+      smokeVel.get(i).y += acceleration.y * dt * slowDown;
+      smokeVel.get(i).x += random(-20, 20) * dt * slowDown;
+      smokeVel.get(i).z += random(-20, 20) * dt * slowDown;
+      
+      smokeLife.set(i, smokeLife.get(i) - dt * slowDown);
+    }
+  }  
 }
 
 
@@ -103,22 +116,22 @@ void UserInput(){
   if(keyPressed){
     if(key == 'w'){
       for(int i = position.size() - 1; i > 0; i--){
-        render_z += .0001;
+        render_z += .001;
       }
     }
     if(key == 's'){
       for(int i = position.size() - 1; i > 0; i--){
-        render_z -=.0001;
+        render_z -=.001;
       }
     }
     if(key == 'a'){
       for(int i = position.size() - 1; i > 0; i--){
-       render_x +=.0001;
+       render_x +=.001;
       }
     }
     if(key =='d'){
       for(int i = position.size() - 1; i > 0; i--){
-        render_x -=.0001;
+        render_x -=.001;
       }
     }
   }
@@ -127,10 +140,13 @@ void UserInput(){
 
 //render the entire scene
 void Simulate(){
+  renderCamera();
   setupScene();  // setup lights and floor
   addPoint();  // add information to arraylists for new point
-  renderPoints();  // transpose stores points, including our new ball
-  
+  renderFire();  // transpose stores points, including our new ball
+  if(smokePos.size() > 0) {
+    RenderSmoke();
+  }
   println("Framerate: " + frameRate);
   println("Number of Balls: " + position.size());
 }
@@ -141,38 +157,30 @@ void Simulate(){
 
 
 
-//check if ball has gone outside of bounds
-//if it has, send it back in
-void CheckBounds(PVector pos, PVector vel){
-  //energy lost due to collisions
-  float energyLost = .20;
-    if(pos.y > SCENE_SIZE){
-      pos.set(pos.x, SCENE_SIZE, pos.z);
-      vel.y *= (-1 * energyLost);
-    }
+void renderCamera() {
+  translate(render_x, render_y, render_z);
 }
 
-void renderPoints(){
-  for(int i = position.size() - 1; i >= 0; i--){
-    
-    //if point has been there too long, kill it before we move it
-    if(lifetime.get(i) < 0){
-      position.remove(i);
-      velocity.remove(i);
-      lifetime.remove(i);
-    }  
-    
-    //color over time
-    stroke(255, lifetime.get(i) * lifeDecay, 0);
-    strokeWeight(6 + lifetime.get(i) * lifeDecay / 25.5);
-    
-    //moving to new position
-    pushMatrix();
-    translate(render_x, 0, render_z);
-    point(position.get(i).x, position.get(i).y, position.get(i).z);
-    popMatrix();    
+
+void Bounds(PVector pos, PVector vel) {
+  float damper = 0.8;
+  
+  if(sq(pos.x) + sq(pos.z) > sq(sampleRadius)) {
+    if(random(1) >.7) {
+      vel.x *= -1 * damper;
+      vel.z *= -1 * damper;
+    }
   }
+  if(pos.y < SCENE_SIZE - 3) {
+    if(random(1) >= 0.7) {
+      float x = pos.x - SCENE_SIZE/2;
+      x *= 0.7;
+      x += SCENE_SIZE/2;
+      pos.x = x;
+    }
+  }   
 }
+
 
 //inner fountain
 void addPoint(){  
@@ -182,9 +190,52 @@ void addPoint(){
     float r = sampleRadius * sqrt(random(0, 1));
     float theta = 2 * PI * random(0, 1);
 
-    velocity.add(new PVector(random(-12, 12), 0, random(-12, 12)));
-    position.add(new PVector(SCENE_SIZE/2 + r * sin(theta), random(SCENE_SIZE - 1, SCENE_SIZE), SCENE_SIZE/2 + r * cos(theta)));
+    velocity.add(new PVector(r * sin(theta), random(-4, 0), r * cos(theta)));
+    position.add(new PVector(SCENE_SIZE/2 + r * sin(theta), random(SCENE_SIZE - 2, SCENE_SIZE), SCENE_SIZE/2 + r * cos(theta)));
     lifetime.add(MAX_LIFE);
+  }
+}
+
+void SpawnSmoke(PVector pos, PVector vel) {
+  smokePos.add(new PVector(pos.x, pos.y, pos.z));
+  smokeVel.add(new PVector(random(-1, 1), vel.y, random(-1, 1)));
+  smokeLife.add(random(1, MAX_LIFE * 2));
+}
+
+void renderFire(){
+  for(int i = position.size() - 1; i >= 0; i--){
+    
+    //if point has been there too long, kill it before we move it
+    if(lifetime.get(i) < 0){
+      SpawnSmoke(position.get(i), velocity.get(i));
+      position.remove(i);
+      velocity.remove(i);
+      lifetime.remove(i);
+    }  
+    //color over time
+    stroke(255, 5 + lifetime.get(i) * lifeDecay, 0, 255);
+    strokeWeight(4 + lifetime.get(i) * lifeDecay / 25.5);
+    
+    //moving to new position
+    point(position.get(i).x, position.get(i).y, position.get(i).z);  
+  }
+}
+
+void RenderSmoke() {
+  for(int i = smokePos.size() - 1; i >= 0; i--){
+    
+    //if point has been there too long, kill it before we move it
+    if(smokeLife.get(i) < 0){
+      smokePos.remove(i);
+      smokeVel.remove(i);
+      smokeLife.remove(i);
+    }      
+    //color over time
+    stroke(random(95, 105), random(95, 105), random(95, 15), 75);
+    strokeWeight(smokeLife.get(i) * lifeDecay / 25.5);
+    
+    //moving to new position
+    point(smokePos.get(i).x, smokePos.get(i).y, smokePos.get(i).z);  
   }
 }
 
@@ -193,14 +244,13 @@ void setupScene(){
   pushMatrix();
   fill(#292900);
   noStroke();
-  translate(render_x, 0, render_z);
   //floor
   translate(SCENE_SIZE/2, 1+SCENE_SIZE, SCENE_SIZE/2);
   box(SCENE_SIZE, 1, SCENE_SIZE);
   //firewood
   fill(#210100);
   translate(0, -0.75, 0);
-  box(2, 1.5, 6);
-  box(6, 1.5, 2);
+  box(1.5, 1.5, 7);
+  box(7, 1.5, 1.5);
   popMatrix();
 }  
