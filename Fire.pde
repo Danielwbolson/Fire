@@ -79,7 +79,7 @@ void TimeStep(){
 
 //calculate how far to move points
 void Update(float dt){
-  float slowDown = .6;
+  float slowDown = 0.6;
   for(int i = 0; i < position.size(); i++){
     
     position.get(i).x += velocity.get(i).x * dt;
