@@ -51,7 +51,7 @@ void setup(){
   camera = new PeasyCam(this, SCENE_SIZE/2, 19 * SCENE_SIZE / 20, (SCENE_SIZE/2.0) / tan (PI*30.0 / 180.0), 10);
 
   camera.setSuppressRollRotationMode();
-  addPoint();  //get our first ball ready
+  addPoint();  //get our first fire point ready
   
   fill(172);
   stroke(0, 172, 255);
@@ -115,24 +115,16 @@ void Update(float dt){
 void UserInput(){
   if(keyPressed){
     if(key == 'w'){
-      for(int i = position.size() - 1; i > 0; i--){
-        render_z += .001;
-      }
+        render_z += 1;
     }
     if(key == 's'){
-      for(int i = position.size() - 1; i > 0; i--){
-        render_z -=.001;
-      }
+        render_z -= 1;
     }
     if(key == 'a'){
-      for(int i = position.size() - 1; i > 0; i--){
-       render_x +=.001;
-      }
+       render_x += 1;
     }
     if(key =='d'){
-      for(int i = position.size() - 1; i > 0; i--){
-        render_x -=.001;
-      }
+        render_x -= 1;
     }
   }
 }
@@ -157,11 +149,12 @@ void Simulate(){
 
 
 
+//translate keyboard input
 void renderCamera() {
   translate(render_x, render_y, render_z);
 }
 
-
+// check if particles are going out of bounds
 void Bounds(PVector pos, PVector vel) {
   float damper = 0.8;
   
@@ -177,12 +170,17 @@ void Bounds(PVector pos, PVector vel) {
       x *= 0.7;
       x += SCENE_SIZE/2;
       pos.x = x;
+      
+      float z = pos.z - SCENE_SIZE/2;
+      z *= 0.7;
+      z += SCENE_SIZE/2;
+      pos.z = z;
     }
   }   
 }
 
 
-//inner fountain
+//spawn points in fire
 void addPoint(){  
   for(int i = 0; i < spawnRate; i++) {
     //calculate uniform disk
@@ -196,12 +194,14 @@ void addPoint(){
   }
 }
 
+//spawn points in smoke
 void SpawnSmoke(PVector pos, PVector vel) {
   smokePos.add(new PVector(pos.x, pos.y, pos.z));
   smokeVel.add(new PVector(random(-1, 1), vel.y, random(-1, 1)));
   smokeLife.add(random(1, MAX_LIFE * 2));
 }
 
+//render fire points
 void renderFire(){
   for(int i = position.size() - 1; i >= 0; i--){
     
@@ -213,7 +213,7 @@ void renderFire(){
       lifetime.remove(i);
     }  
     //color over time
-    stroke(255, 5 + lifetime.get(i) * lifeDecay, 0, 255);
+    stroke(255, lifetime.get(i) * lifeDecay, 0, 255);
     strokeWeight(4 + lifetime.get(i) * lifeDecay / 25.5);
     
     //moving to new position
@@ -221,6 +221,7 @@ void renderFire(){
   }
 }
 
+//render smoke points
 void RenderSmoke() {
   for(int i = smokePos.size() - 1; i >= 0; i--){
     
